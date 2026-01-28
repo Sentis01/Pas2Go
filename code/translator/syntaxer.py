@@ -236,7 +236,7 @@ class SyntaxAnalyzer:
 
     def parse_compare(self) -> ExpressionNode:
         node = self.parse_add()
-        while self.current_token and self.current_token.type == 'OPERATOR' and self.current_token.value in ['==', '!=', '<', '>', '<=', '>=']:
+        while self.current_token and self.current_token.type == 'OPERATOR' and self.current_token.value in ['==', '!=', '<', '>', '<=', '>=', '=', '<>']:
             op_token = self.current_token
             self.advance()
             node = BinOperatorNode(op_token, node, self.parse_add())

@@ -44,7 +44,7 @@ TOKEN_SPECIFICATION = [
     ('RPAR',         r'\)'),
     ('LBRACKET',     r'\['),
     ('RBRACKET',     r'\]'),
-    ('OPERATOR',     r'(\+|\-|\*|/|==|!=|<=|>=|<|>|\band\b|\bor\b|\bxor\b)'),
+    ('OPERATOR',     r'(\+|\-|\*|/|==|!=|<=|>=|<>|<|>|=|\band\b|\bor\b|\bxor\b)'),
     ('RANGE',        r'\.\.'),
     ('NUMBER',       r'-?\d+(\.\d+)?'),
     ('BOOL_LIT',     r'\btrue\b|\bfalse\b'),

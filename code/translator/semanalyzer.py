@@ -128,7 +128,7 @@ class SemanticAnalyzer:
                 for arg in node.args:
                     self.check_expression(arg)
                 return
-            self.check_call(node.name, node.args, allow_procedure=True, allow_function=True)
+            self.check_call(node.name, node.args, allow_procedure=True, allow_function=False)
 
         elif isinstance(node, FunctionCallNode):
             self.check_call(node.name, node.args, allow_procedure=False, allow_function=True)
@@ -211,6 +211,8 @@ class SemanticAnalyzer:
 
         elif isinstance(node, FunctionCallNode):
             if node.name not in self.functions:
+                if node.name in self.procedures:
+                    raise TypeError(f"{node.name} является процедурой и не может использоваться как функция")
                 raise NameError(f"Функция {node.name} не объявлена")
             self.check_call(node.name, node.args, allow_procedure=False, allow_function=True)
             return self.functions[node.name]['return_type']
@@ -227,7 +229,7 @@ class SemanticAnalyzer:
                 return 'boolean'
             
             # Операторы сравнения
-            elif node.operator.value in ['==', '!=', '<', '>', '<=', '>=']:
+            elif node.operator.value in ['==', '!=', '<', '>', '<=', '>=', '=', '<>']:
                 if self.is_array_type(left_type) or self.is_array_type(right_type):
                     raise TypeError("Сравнение массивов не поддерживается")
                 if left_type != right_type:
