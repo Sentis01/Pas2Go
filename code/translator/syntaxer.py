@@ -275,7 +275,7 @@ class SyntaxAnalyzer:
 
     def parse_mul(self) -> ExpressionNode:
         node = self.parse_unary()
-        while self.current_token and self.current_token.type == 'OPERATOR' and self.current_token.value in ['*', '/']:
+        while self.current_token and self.current_token.type == 'OPERATOR' and self.current_token.value in ['*', '/', 'div', 'mod']:
             op_token = self.current_token
             self.advance()
             node = BinOperatorNode(op_token, node, self.parse_unary())
