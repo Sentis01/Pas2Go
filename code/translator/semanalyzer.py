@@ -2,29 +2,72 @@ from nodes import *
 
 class SemanticAnalyzer:
     def __init__(self) -> None:
-        self.variables = {}
-        self.current_scope = "global"
+        self.scopes = [{}]
+        self.functions = {}
+        self.procedures = {}
         self.in_loop = False
 
-    def check_program(self, root: StatementNode):
+    def push_scope(self):
+        self.scopes.append({})
+
+    def pop_scope(self):
+        self.scopes.pop()
+
+    def declare(self, name: str, var_type: str):
+        if name in self.scopes[-1]:
+            raise NameError(f"Переменная {name} уже объявлена")
+        self.scopes[-1][name] = var_type
+
+    def lookup(self, name: str):
+        for scope in reversed(self.scopes):
+            if name in scope:
+                return scope[name]
+        return None
+
+    def check_program(self, root: ExpressionNode):
+        if isinstance(root, ProgramNode):
+            for var_name, var_type in root.declarations:
+                self.declare(var_name, var_type)
+
+            for routine in root.routines:
+                if isinstance(routine, FunctionDeclNode):
+                    if routine.name in self.functions or routine.name in self.procedures:
+                        raise NameError(f"Функция/процедура {routine.name} уже объявлена")
+                    self.functions[routine.name] = {
+                        'params': routine.params,
+                        'return_type': routine.return_type
+                    }
+                elif isinstance(routine, ProcedureDeclNode):
+                    if routine.name in self.functions or routine.name in self.procedures:
+                        raise NameError(f"Функция/процедура {routine.name} уже объявлена")
+                    self.procedures[routine.name] = {
+                        'params': routine.params
+                    }
+
+            for routine in root.routines:
+                self.check_node(routine)
+
+            for stmt in root.main_block.body:
+                self.check_node(stmt)
+            return
+
         for node in root.codeStrings:
             self.check_node(node)
 
     def check_node(self, node: ExpressionNode):
         if isinstance(node, VarDeclarationNode):
             for var_name, var_type in node.declarations:
-                if var_name in self.variables:
-                    raise NameError(f"Переменная {var_name} уже объявлена")
-                self.variables[var_name] = var_type
+                self.declare(var_name, var_type)
 
         elif isinstance(node, BinOperatorNode):
             if node.operator.type == 'ASSIGN':
                 var_name = node.leftNode.value.value
-                if var_name not in self.variables:
+                if self.lookup(var_name) is None:
                     raise NameError(f"Переменная {var_name} не объявлена")
                 expr_type = self.infer_type(node.rightNode)
-                if expr_type != self.variables[var_name]:
-                    raise TypeError(f"Тип {expr_type} не соответствует {self.variables[var_name]}")
+                var_type = self.lookup(var_name)
+                if expr_type != var_type:
+                    raise TypeError(f"Тип {expr_type} не соответствует {var_type}")
 
         elif isinstance(node, IfStatementNode):
             self.check_condition(node.condition)
@@ -41,12 +84,19 @@ class SemanticAnalyzer:
                 self.check_node(stmt)
             self.in_loop = False
 
+        elif isinstance(node, RepeatUntilStatementNode):
+            self.in_loop = True
+            for stmt in node.body.body:
+                self.check_node(stmt)
+            self.in_loop = False
+            self.check_condition(node.condition)
+
         elif isinstance(node, ForStatementNode):
             var_name = node.var_token.value
 
-            if var_name not in self.variables:
+            if self.lookup(var_name) is None:
                 raise NameError(f"Переменная {var_name} не объявлена")
-            if self.variables[var_name] != 'integer':
+            if self.lookup(var_name) != 'integer':
                 raise TypeError(f"Переменная цикла {var_name} должна быть типа integer")
 
             start_type = self.infer_type(node.start_expr)
@@ -61,8 +111,48 @@ class SemanticAnalyzer:
             self.in_loop = False
 
         elif isinstance(node, ProcedureCallNode):
-            for arg in node.args:
-                self.check_expression(arg)
+            if node.name.lower() == 'writeln':
+                for arg in node.args:
+                    self.check_expression(arg)
+                return
+            self.check_call(node.name, node.args, allow_procedure=True, allow_function=True)
+
+        elif isinstance(node, FunctionCallNode):
+            self.check_call(node.name, node.args, allow_procedure=False, allow_function=True)
+
+        elif isinstance(node, FunctionDeclNode):
+            self.push_scope()
+            for param_name, param_type in node.params:
+                self.declare(param_name, param_type)
+            self.declare(node.name, node.return_type)
+            for var_name, var_type in node.local_decls:
+                self.declare(var_name, var_type)
+            for stmt in node.body.body:
+                self.check_node(stmt)
+            self.pop_scope()
+
+        elif isinstance(node, ProcedureDeclNode):
+            self.push_scope()
+            for param_name, param_type in node.params:
+                self.declare(param_name, param_type)
+            for var_name, var_type in node.local_decls:
+                self.declare(var_name, var_type)
+            for stmt in node.body.body:
+                self.check_node(stmt)
+            self.pop_scope()
+
+        elif isinstance(node, CaseStatementNode):
+            expr_type = self.infer_type(node.expression)
+            for labels, block in node.cases:
+                for label in labels:
+                    label_type = self.infer_type(label)
+                    if label_type != expr_type:
+                        raise TypeError(f"Тип метки {label_type} не соответствует {expr_type}")
+                for stmt in block.body:
+                    self.check_node(stmt)
+            if node.else_block:
+                for stmt in node.else_block.body:
+                    self.check_node(stmt)
 
     def check_expression(self, node: ExpressionNode):
         if isinstance(node, BinOperatorNode):
@@ -70,6 +160,9 @@ class SemanticAnalyzer:
             right_type = self.infer_type(node.rightNode)
             if node.operator.value in ['+', '-', '*', '/'] and (left_type != 'integer' or right_type != 'integer'):
                 raise TypeError("Арифметические операции требуют integer")
+        elif isinstance(node, UnaryOperatorNode):
+            if node.operator.value.lower() == 'not' and self.infer_type(node.operand) != 'boolean':
+                raise TypeError("Оператор not требует boolean")
 
     def infer_type(self, node: ExpressionNode) -> str:
         if isinstance(node, ValueNode):
@@ -77,15 +170,31 @@ class SemanticAnalyzer:
                 return 'integer'
             elif node.value.type == 'STRING':
                 return 'string'
+            elif node.value.type == 'BOOL_LIT':
+                return 'boolean'
             elif node.value.type == 'IDENTIFIER':
-                return self.variables.get(node.value.value, 'unknown')
+                return self.lookup(node.value.value) or 'unknown'
         
+        elif isinstance(node, UnaryOperatorNode):
+            if node.operator.value.lower() == 'not':
+                if self.infer_type(node.operand) != 'boolean':
+                    raise TypeError("Оператор not требует boolean")
+                return 'boolean'
+            return 'unknown'
+
+        elif isinstance(node, FunctionCallNode):
+            if node.name not in self.functions:
+                raise NameError(f"Функция {node.name} не объявлена")
+            self.check_call(node.name, node.args, allow_procedure=False, allow_function=True)
+            return self.functions[node.name]['return_type']
+
         elif isinstance(node, BinOperatorNode):
             left_type = self.infer_type(node.leftNode)
             right_type = self.infer_type(node.rightNode)
 
             # Логические операторы
-            if node.operator.value in ['and', 'or']:
+            op_value = node.operator.value.lower()
+            if op_value in ['and', 'or', 'xor']:
                 if left_type != 'boolean' or right_type != 'boolean':
                     raise TypeError(f"Логические операторы требуют boolean, получено {left_type} и {right_type}")
                 return 'boolean'
@@ -103,6 +212,26 @@ class SemanticAnalyzer:
                 return 'integer'
         
         return 'unknown'
+
+    def check_call(self, name: str, args: list, allow_procedure: bool, allow_function: bool):
+        if name in self.procedures:
+            if not allow_procedure:
+                raise TypeError(f"{name} является процедурой и не может использоваться как функция")
+            signature = self.procedures[name]
+        elif name in self.functions:
+            if not allow_function:
+                raise TypeError(f"{name} является функцией и не может использоваться как процедура")
+            signature = self.functions[name]
+        else:
+            raise NameError(f"Процедура/функция {name} не объявлена")
+
+        params = signature['params']
+        if len(args) != len(params):
+            raise TypeError(f"Неверное количество аргументов при вызове {name}")
+        for arg, (_, param_type) in zip(args, params):
+            arg_type = self.infer_type(arg)
+            if arg_type != param_type:
+                raise TypeError(f"Тип аргумента {arg_type} не соответствует {param_type}")
     def check_condition(self, condition: ExpressionNode):
         if self.infer_type(condition) != 'boolean':
             raise TypeError("Условие должно быть логическим")

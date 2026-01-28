@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block body %}
+
+<div class="container my-5">
+    <h1 class="text-center mb-4">Pascal-to-Go Translator</h1>
+    <form action="{{ url_for('index') }}" method="GET">
+        <div class="row g-4">
+            
+            <div class="col-md-6">
+                <div class="card h-100 shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h2 class="card-title mb-0">Pascal Code</h2>
+                    </div>
+                    <div class="card-body">
+                        <textarea class="form-control fs-5" name="input" rows="12"
+                            placeholder="Write your Pascal code here" id="input"
+                            onkeydown="if(event.keyCode===9){var v=this.value,s=this.selectionStart,e=this.selectionEnd;this.value=v.substring(0, s)+'\t'+v.substring(e);this.selectionStart=this.selectionEnd=s+1;return false;}">{{ input }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="col-md-6">
+                <div class="card h-100 shadow">
+                    <div class="card-header bg-success text-white">
+                        <h2 class="card-title mb-0">Go Code</h2>
+                    </div>
+                    <div class="card-body">
+                        <textarea class="form-control fs-5" rows="12" readonly id="output">{{ output }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <button type="submit" class="btn btn-lg btn-primary">
+                <i class="bi bi-arrow-right"></i> Translate
+            </button>
+            <button type="button" class="btn btn-lg btn-outline-secondary ms-2" id="upload-btn">
+                Upload file
+            </button>
+            <button type="button" class="btn btn-lg btn-outline-success ms-2" id="download-btn">
+                Download Go
+            </button>
+        </div>
+        <input type="file" id="upload-input" accept=".pas,.txt" class="d-none">
+    </form>
+
+   
+    {% if output %}
+    <div class="row g-4 mt-4">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h2 class="card-title mb-0">Syntax Tree</h2>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control fs-5" rows="8" readonly>{{ syntaxTree }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h2 class="card-title mb-0">Tokens</h2>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control fs-5" rows="8" readonly>{{ tokens }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    (function () {
+        var uploadBtn = document.getElementById('upload-btn');
+        var uploadInput = document.getElementById('upload-input');
+        var inputArea = document.getElementById('input');
+        var downloadBtn = document.getElementById('download-btn');
+        var outputArea = document.getElementById('output');
+
+        if (uploadBtn && uploadInput && inputArea) {
+            uploadBtn.addEventListener('click', function () {
+                uploadInput.click();
+            });
+
+            uploadInput.addEventListener('change', function (event) {
+                var file = event.target.files && event.target.files[0];
+                if (!file) {
+                    return;
+                }
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    inputArea.value = e.target.result;
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        if (downloadBtn && outputArea) {
+            downloadBtn.addEventListener('click', function () {
+                var content = outputArea.value || '';
+                var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement('a');
+                link.href = url;
+                link.download = 'output.go';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            });
+        }
+    })();
+</script>
+
+{% endblock body %}
