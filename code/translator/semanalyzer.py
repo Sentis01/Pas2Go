@@ -158,8 +158,11 @@ class SemanticAnalyzer:
         if isinstance(node, BinOperatorNode):
             left_type = self.infer_type(node.leftNode)
             right_type = self.infer_type(node.rightNode)
-            if node.operator.value in ['+', '-', '*', '/'] and (left_type != 'integer' or right_type != 'integer'):
-                raise TypeError("Арифметические операции требуют integer")
+            if node.operator.value in ['+', '-', '*', '/']:
+                if left_type not in ['integer', 'float'] or right_type not in ['integer', 'float']:
+                    raise TypeError("Арифметические операции требуют числовые типы")
+                if left_type != right_type:
+                    raise TypeError("Арифметические операции требуют одинаковые числовые типы")
         elif isinstance(node, UnaryOperatorNode):
             if node.operator.value.lower() == 'not' and self.infer_type(node.operand) != 'boolean':
                 raise TypeError("Оператор not требует boolean")
@@ -167,11 +170,13 @@ class SemanticAnalyzer:
     def infer_type(self, node: ExpressionNode) -> str:
         if isinstance(node, ValueNode):
             if node.value.type == 'NUMBER':
-                return 'integer'
+                return 'float' if '.' in node.value.value else 'integer'
             elif node.value.type == 'STRING':
                 return 'string'
             elif node.value.type == 'BOOL_LIT':
                 return 'boolean'
+            elif node.value.type == 'CHAR_LIT':
+                return 'char'
             elif node.value.type == 'IDENTIFIER':
                 return self.lookup(node.value.value) or 'unknown'
         
@@ -207,9 +212,11 @@ class SemanticAnalyzer:
             
             # Арифметические операторы
             elif node.operator.value in ['+', '-', '*', '/']:
-                if left_type != 'integer' or right_type != 'integer':
-                    raise TypeError(f"Арифметические операции требуют integer, получено {left_type} и {right_type}")
-                return 'integer'
+                if left_type not in ['integer', 'float'] or right_type not in ['integer', 'float']:
+                    raise TypeError(f"Арифметические операции требуют числовые типы, получено {left_type} и {right_type}")
+                if left_type != right_type:
+                    raise TypeError(f"Арифметические операции требуют одинаковые типы, получено {left_type} и {right_type}")
+                return left_type
         
         return 'unknown'
 

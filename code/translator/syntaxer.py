@@ -98,7 +98,7 @@ class SyntaxAnalyzer:
             self.advance()
             self.require('COLON')
             # Исправлено: проверка типа
-            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL']:
+            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL', 'FLOAT', 'CHAR']:
                 raise SyntaxError(f"Неверный тип переменной: {self.current_token.value}")
             var_type = self.current_token.value.lower()
             if self.current_token.type == 'BOOL':
@@ -122,7 +122,7 @@ class SyntaxAnalyzer:
             while self.match('COMMA'):
                 names.append(self.require('IDENTIFIER').value)
             self.require('COLON')
-            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL']:
+            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL', 'FLOAT', 'CHAR']:
                 raise SyntaxError(f"Неверный тип параметра: {self.current_token.value}")
             param_type = self.current_token.value.lower()
             if self.current_token.type == 'BOOL':
@@ -207,7 +207,7 @@ class SyntaxAnalyzer:
             raise SyntaxError(f"Неизвестный оператор: {self.current_token.type}")
         
     def parse_term(self) -> ExpressionNode:
-        if self.current_token.type in ['NUMBER', 'STRING', 'BOOL_LIT']:
+        if self.current_token.type in ['NUMBER', 'STRING', 'BOOL_LIT', 'CHAR_LIT']:
             node = ValueNode(self.current_token)
             self.advance()
             return node
@@ -482,7 +482,7 @@ class SyntaxAnalyzer:
         return CaseStatementNode(expression, cases, else_block)
 
     def parse_case_label(self) -> ExpressionNode:
-        if self.current_token.type in ['NUMBER', 'STRING', 'BOOL_LIT', 'IDENTIFIER']:
+        if self.current_token.type in ['NUMBER', 'STRING', 'BOOL_LIT', 'CHAR_LIT', 'IDENTIFIER']:
             node = ValueNode(self.current_token)
             self.advance()
             return node
