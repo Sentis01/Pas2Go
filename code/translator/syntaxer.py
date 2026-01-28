@@ -31,7 +31,15 @@ class SyntaxAnalyzer:
             token = self.current_token
             self.advance()
             return token
-        raise SyntaxError(f"Ожидается {token_type}, но получен {self.current_token.type if self.current_token else 'EOF'}")
+        raise SyntaxError(self.format_error(
+            f"Ожидается {token_type}, но получен {self.current_token.type if self.current_token else 'EOF'}",
+            self.current_token
+        ))
+
+    def format_error(self, message: str, token: Token = None) -> str:
+        if token:
+            return f"{message} (строка {token.line}, колонка {token.column})"
+        return f"{message} (строка ?, колонка ?)"
 
     def parse_program(self) -> ProgramNode:
         self.require('PROGRAM')
@@ -58,7 +66,10 @@ class SyntaxAnalyzer:
             params = self.parse_params()
             self.require('COLON')
             if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL']:
-                raise SyntaxError(f"Неверный тип возвращаемого значения: {self.current_token.value}")
+                raise SyntaxError(self.format_error(
+                    f"Неверный тип возвращаемого значения: {self.current_token.value}",
+                    self.current_token
+                ))
             return_type = self.current_token.value.lower()
             if self.current_token.type == 'BOOL':
                 return_type = 'boolean'
@@ -88,18 +99,24 @@ class SyntaxAnalyzer:
             return ProcedureDeclNode(name, params, local_decls, body)
 
         else:
-            raise SyntaxError(f"Ожидается FUNCTION или PROCEDURE, получено {self.current_token.type}")
+            raise SyntaxError(self.format_error(
+                f"Ожидается FUNCTION или PROCEDURE, получено {self.current_token.type}",
+                self.current_token
+            ))
 
     def parse_var_declaration(self) -> list:
         self.require('VAR')
         declarations = []
         while self.current_token.type == 'IDENTIFIER':
-            var_name = self.current_token.value
+            names = [self.current_token.value]
             self.advance()
+            while self.match('COMMA'):
+                names.append(self.require('IDENTIFIER').value)
             self.require('COLON')
             # Исправлено: проверка типа
             var_type = self.parse_type(allow_array=True)
-            declarations.append((var_name, var_type))
+            for var_name in names:
+                declarations.append((var_name, var_type))
             self.require('SEMICOLON')
         return declarations
 
@@ -193,7 +210,10 @@ class SyntaxAnalyzer:
             return self.parse_case_statement()
 
         else:
-            raise SyntaxError(f"Неизвестный оператор: {self.current_token.type}")
+            raise SyntaxError(self.format_error(
+                f"Неизвестный оператор: {self.current_token.type}",
+                self.current_token
+            ))
         
     def parse_term(self) -> ExpressionNode:
         if self.current_token.type in ['NUMBER', 'STRING', 'BOOL_LIT', 'CHAR_LIT']:
@@ -213,7 +233,10 @@ class SyntaxAnalyzer:
             self.require('RPAR')
             return node
         else:
-            raise SyntaxError(f"Недопустимый терм: {self.current_token.type}")
+            raise SyntaxError(self.format_error(
+                f"Недопустимый терм: {self.current_token.type}",
+                self.current_token
+            ))
 
     def parse_expression(self) -> ExpressionNode:
         return self.parse_or()
@@ -397,7 +420,10 @@ class SyntaxAnalyzer:
 
         direction = self.current_token.type
         if direction not in ['TO', 'DOWNTO']:
-            raise SyntaxError(f"Ожидается TO или DOWNTO, получено {self.current_token.type}")
+            raise SyntaxError(self.format_error(
+                f"Ожидается TO или DOWNTO, получено {self.current_token.type}",
+                self.current_token
+            ))
         self.advance()
 
         end_expr = self.parse_expression()
@@ -481,11 +507,17 @@ class SyntaxAnalyzer:
             node = ValueNode(self.current_token)
             self.advance()
             return node
-        raise SyntaxError(f"Неверная метка CASE: {self.current_token.type}")
+        raise SyntaxError(self.format_error(
+            f"Неверная метка CASE: {self.current_token.type}",
+            self.current_token
+        ))
 
     def parse_lvalue(self) -> ExpressionNode:
         if self.current_token.type != 'IDENTIFIER':
-            raise SyntaxError(f"Ожидается идентификатор, получено {self.current_token.type}")
+            raise SyntaxError(self.format_error(
+                f"Ожидается идентификатор, получено {self.current_token.type}",
+                self.current_token
+            ))
         if self.peek() and self.peek().type == 'LBRACKET':
             return self.parse_array_access()
         node = ValueNode(self.current_token)
@@ -493,32 +525,33 @@ class SyntaxAnalyzer:
         return node
 
     def parse_array_access(self) -> ArrayAccessNode:
-        name = self.require('IDENTIFIER').value
+        name_token = self.require('IDENTIFIER')
+        name = name_token.value
         self.require('LBRACKET')
         index = self.parse_expression()
         self.require('RBRACKET')
-        return ArrayAccessNode(name, index)
+        return ArrayAccessNode(name, index, name_token)
 
     def parse_type(self, allow_array: bool) -> any:
         if self.current_token.type == 'ARRAY':
             if not allow_array:
-                raise SyntaxError("Массивы не поддерживаются в параметрах")
+                raise SyntaxError(self.format_error("Массивы не поддерживаются в параметрах", self.current_token))
             self.advance()
             self.require('LBRACKET')
             low_tok = self.require('NUMBER')
             if '.' in low_tok.value:
-                raise SyntaxError("Нижняя граница массива должна быть integer")
+                raise SyntaxError(self.format_error("Нижняя граница массива должна быть integer", low_tok))
             self.require('RANGE')
             high_tok = self.require('NUMBER')
             if '.' in high_tok.value:
-                raise SyntaxError("Верхняя граница массива должна быть integer")
+                raise SyntaxError(self.format_error("Верхняя граница массива должна быть integer", high_tok))
             self.require('RBRACKET')
             self.require('OF')
             elem_type = self.parse_type(allow_array=False)
             low = int(low_tok.value)
             high = int(high_tok.value)
             if low > high:
-                raise SyntaxError("Нижняя граница массива больше верхней")
+                raise SyntaxError(self.format_error("Нижняя граница массива больше верхней", low_tok))
             return {'kind': 'array', 'low': low, 'high': high, 'elem': elem_type}
 
         if self.current_token.type in ['INTEGER', 'STRING', 'BOOL', 'FLOAT', 'CHAR']:
@@ -528,7 +561,10 @@ class SyntaxAnalyzer:
             self.advance()
             return var_type
 
-        raise SyntaxError(f"Неверный тип: {self.current_token.value}")
+        raise SyntaxError(self.format_error(
+            f"Неверный тип: {self.current_token.value}",
+            self.current_token
+        ))
 
     def format_type(self, type_) -> str:
         if isinstance(type_, dict) and type_.get('kind') == 'array':
@@ -536,21 +572,23 @@ class SyntaxAnalyzer:
         return str(type_)
 
     def parse_procedure_call(self) -> ProcedureCallNode:
-        name = self.require('IDENTIFIER').value
+        name_token = self.require('IDENTIFIER')
+        name = name_token.value
         self.require('LPAR')
         args = []
         while not self.match('RPAR'):
             args.append(self.parse_expression())
             if self.match('COMMA'):
                 continue
-        return ProcedureCallNode(name, args)
+        return ProcedureCallNode(name, args, name_token)
 
     def parse_function_call(self) -> FunctionCallNode:
-        name = self.require('IDENTIFIER').value
+        name_token = self.require('IDENTIFIER')
+        name = name_token.value
         self.require('LPAR')
         args = []
         while not self.match('RPAR'):
             args.append(self.parse_expression())
             if self.match('COMMA'):
                 continue
-        return FunctionCallNode(name, args)
+        return FunctionCallNode(name, args, name_token)

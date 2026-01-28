@@ -8,9 +8,10 @@ class VarDeclarationNode(ExpressionNode):
         self.declarations = declarations
 
 class ProcedureCallNode(ExpressionNode):
-    def __init__(self, name: str, args: list):
+    def __init__(self, name: str, args: list, token: Token = None):
         self.name = name
         self.args = args
+        self.token = token
 
 class ValueNode(ExpressionNode):
     def __init__(self, value: Token) -> None:
@@ -74,14 +75,16 @@ class ProcedureDeclNode(ExpressionNode):
         self.body = body
 
 class FunctionCallNode(ExpressionNode):
-    def __init__(self, name: str, args: list):
+    def __init__(self, name: str, args: list, token: Token = None):
         self.name = name
         self.args = args
+        self.token = token
 
 class ArrayAccessNode(ExpressionNode):
-    def __init__(self, name: str, index: ExpressionNode):
+    def __init__(self, name: str, index: ExpressionNode, token: Token = None):
         self.name = name
         self.index = index
+        self.token = token
 
 class ForStatementNode(ExpressionNode):
     def __init__(self, var_token: Token, start_expr: ExpressionNode, end_expr: ExpressionNode, direction: str, body: BlockNode):

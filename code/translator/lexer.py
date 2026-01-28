@@ -44,7 +44,7 @@ TOKEN_SPECIFICATION = [
     ('RPAR',         r'\)'),
     ('LBRACKET',     r'\['),
     ('RBRACKET',     r'\]'),
-    ('OPERATOR',     r'(\+|\-|\*|/|==|!=|<=|>=|<>|<|>|=|\band\b|\bor\b|\bxor\b)'),
+    ('OPERATOR',     r'(\+|\-|\*|/|==|!=|<=|>=|<>|<|>|=|\band\b|\bor\b|\bxor\b|\bdiv\b|\bmod\b)'),
     ('RANGE',        r'\.\.'),
     ('NUMBER',       r'-?\d+(\.\d+)?'),
     ('BOOL_LIT',     r'\btrue\b|\bfalse\b'),
@@ -70,14 +70,21 @@ def tokenize(code: str) -> list[Token]:
         column = mo.start() - line_start
 
         if kind in ['SKIP', 'COMMENT1', 'COMMENT2']:
+            if '\n' in value:
+                line_num += value.count('\n')
+                line_start = mo.end() - (len(value) - value.rfind('\n') - 1)
             continue
         elif kind == 'MISMATCH':
-            raise SyntaxError(f"Недопустимый символ '{value}' на строке {line_num}")
+            raise SyntaxError(f"Недопустимый символ '{value}' на строке {line_num}, колонка {column}")
         elif kind == 'STRING_LIT':
             tokens.append(Token('STRING', value, line_num, column))
         elif kind == 'IDENTIFIER' and value.lower() in {'package', 'import', 'func'}:
-            raise NameError(f"Использование зарезервированного слова Go: '{value}'")
+            raise NameError(f"Использование зарезервированного слова Go: '{value}' (строка {line_num}, колонка {column})")
         else:
             tokens.append(Token(kind, value, line_num, column))
+
+        if '\n' in value:
+            line_num += value.count('\n')
+            line_start = mo.end() - (len(value) - value.rfind('\n') - 1)
 
     return tokens
