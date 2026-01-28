@@ -78,6 +78,11 @@ class FunctionCallNode(ExpressionNode):
         self.name = name
         self.args = args
 
+class ArrayAccessNode(ExpressionNode):
+    def __init__(self, name: str, index: ExpressionNode):
+        self.name = name
+        self.index = index
+
 class ForStatementNode(ExpressionNode):
     def __init__(self, var_token: Token, start_expr: ExpressionNode, end_expr: ExpressionNode, direction: str, body: BlockNode):
         self.var_token = var_token

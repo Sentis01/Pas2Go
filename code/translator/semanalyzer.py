@@ -61,13 +61,26 @@ class SemanticAnalyzer:
 
         elif isinstance(node, BinOperatorNode):
             if node.operator.type == 'ASSIGN':
-                var_name = node.leftNode.value.value
-                if self.lookup(var_name) is None:
-                    raise NameError(f"Переменная {var_name} не объявлена")
-                expr_type = self.infer_type(node.rightNode)
-                var_type = self.lookup(var_name)
-                if expr_type != var_type:
-                    raise TypeError(f"Тип {expr_type} не соответствует {var_type}")
+                if isinstance(node.leftNode, ArrayAccessNode):
+                    arr_name = node.leftNode.name
+                    arr_type = self.lookup(arr_name)
+                    if arr_type is None or not self.is_array_type(arr_type):
+                        raise NameError(f"Переменная {arr_name} не объявлена как массив")
+                    index_type = self.infer_type(node.leftNode.index)
+                    if index_type != 'integer':
+                        raise TypeError("Индекс массива должен быть integer")
+                    expr_type = self.infer_type(node.rightNode)
+                    elem_type = arr_type['elem']
+                    if expr_type != elem_type:
+                        raise TypeError(f"Тип {expr_type} не соответствует {elem_type}")
+                else:
+                    var_name = node.leftNode.value.value
+                    if self.lookup(var_name) is None:
+                        raise NameError(f"Переменная {var_name} не объявлена")
+                    expr_type = self.infer_type(node.rightNode)
+                    var_type = self.lookup(var_name)
+                    if expr_type != var_type:
+                        raise TypeError(f"Тип {expr_type} не соответствует {var_type}")
 
         elif isinstance(node, IfStatementNode):
             self.check_condition(node.condition)
@@ -180,6 +193,15 @@ class SemanticAnalyzer:
             elif node.value.type == 'IDENTIFIER':
                 return self.lookup(node.value.value) or 'unknown'
         
+        elif isinstance(node, ArrayAccessNode):
+            arr_type = self.lookup(node.name)
+            if arr_type is None or not self.is_array_type(arr_type):
+                raise NameError(f"Массив {node.name} не объявлен")
+            index_type = self.infer_type(node.index)
+            if index_type != 'integer':
+                raise TypeError("Индекс массива должен быть integer")
+            return arr_type['elem']
+
         elif isinstance(node, UnaryOperatorNode):
             if node.operator.value.lower() == 'not':
                 if self.infer_type(node.operand) != 'boolean':
@@ -206,12 +228,16 @@ class SemanticAnalyzer:
             
             # Операторы сравнения
             elif node.operator.value in ['==', '!=', '<', '>', '<=', '>=']:
+                if self.is_array_type(left_type) or self.is_array_type(right_type):
+                    raise TypeError("Сравнение массивов не поддерживается")
                 if left_type != right_type:
                     raise TypeError(f"Сравнение типов {left_type} и {right_type} невозможно")
                 return 'boolean'
             
             # Арифметические операторы
             elif node.operator.value in ['+', '-', '*', '/']:
+                if self.is_array_type(left_type) or self.is_array_type(right_type):
+                    raise TypeError("Арифметика с массивами не поддерживается")
                 if left_type not in ['integer', 'float'] or right_type not in ['integer', 'float']:
                     raise TypeError(f"Арифметические операции требуют числовые типы, получено {left_type} и {right_type}")
                 if left_type != right_type:
@@ -239,6 +265,9 @@ class SemanticAnalyzer:
             arg_type = self.infer_type(arg)
             if arg_type != param_type:
                 raise TypeError(f"Тип аргумента {arg_type} не соответствует {param_type}")
+
+    def is_array_type(self, type_) -> bool:
+        return isinstance(type_, dict) and type_.get('kind') == 'array'
     def check_condition(self, condition: ExpressionNode):
         if self.infer_type(condition) != 'boolean':
             raise TypeError("Условие должно быть логическим")

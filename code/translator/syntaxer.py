@@ -98,12 +98,7 @@ class SyntaxAnalyzer:
             self.advance()
             self.require('COLON')
             # Исправлено: проверка типа
-            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL', 'FLOAT', 'CHAR']:
-                raise SyntaxError(f"Неверный тип переменной: {self.current_token.value}")
-            var_type = self.current_token.value.lower()
-            if self.current_token.type == 'BOOL':
-                var_type = 'boolean'
-            self.advance()
+            var_type = self.parse_type(allow_array=True)
             declarations.append((var_name, var_type))
             self.require('SEMICOLON')
         return declarations
@@ -122,12 +117,7 @@ class SyntaxAnalyzer:
             while self.match('COMMA'):
                 names.append(self.require('IDENTIFIER').value)
             self.require('COLON')
-            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL', 'FLOAT', 'CHAR']:
-                raise SyntaxError(f"Неверный тип параметра: {self.current_token.value}")
-            param_type = self.current_token.value.lower()
-            if self.current_token.type == 'BOOL':
-                param_type = 'boolean'
-            self.advance()
+            param_type = self.parse_type(allow_array=False)
             for name in names:
                 params.append((name, param_type))
             if self.match('SEMICOLON'):
@@ -141,8 +131,7 @@ class SyntaxAnalyzer:
         if self.current_token.type == 'IDENTIFIER':
             if self.peek() and self.peek().type == 'LPAR':
                 return self.parse_procedure_call()
-            var_node = ValueNode(self.current_token)
-            self.advance()
+            var_node = self.parse_lvalue()
             self.require('ASSIGN')
             expr_node = self.parse_expression()
             return BinOperatorNode(Token('ASSIGN', ':=', 0, 0), var_node, expr_node)
@@ -214,6 +203,8 @@ class SyntaxAnalyzer:
         if self.current_token.type == 'IDENTIFIER':
             if self.peek() and self.peek().type == 'LPAR':
                 return self.parse_function_call()
+            if self.peek() and self.peek().type == 'LBRACKET':
+                return self.parse_array_access()
             node = ValueNode(self.current_token)
             self.advance()
             return node
@@ -280,7 +271,7 @@ class SyntaxAnalyzer:
             if root.declarations:
                 textTree += "VarDeclaration:\n"
                 for name, type_ in root.declarations:
-                    textTree += f"  {name} : {type_}\n"
+                    textTree += f"  {name} : {self.format_type(type_)}\n"
             for routine in root.routines:
                 textTree += self.getTextNode(routine)
             textTree += "MainBlock:\n"
@@ -298,7 +289,7 @@ class SyntaxAnalyzer:
         if isinstance(node, VarDeclarationNode):
             result += f"{indent}VarDeclaration:\n"
             for name, type_ in node.declarations:
-                result += f"{indent}  {name} : {type_}\n"
+                result += f"{indent}  {name} : {self.format_type(type_)}\n"
 
         elif isinstance(node, BinOperatorNode):
             result += f"{indent}BinOp: {node.operator.value}\n"
@@ -318,6 +309,10 @@ class SyntaxAnalyzer:
             result += f"{indent}FunctionCall: {node.name}\n"
             for arg in node.args:
                 result += self.getTextNode(arg, level + 1)
+
+        elif isinstance(node, ArrayAccessNode):
+            result += f"{indent}ArrayAccess: {node.name}\n"
+            result += self.getTextNode(node.index, level + 1)
 
         elif isinstance(node, ValueNode):
             result += f"{indent}Value: {node.value.value}\n"
@@ -368,12 +363,12 @@ class SyntaxAnalyzer:
             if node.params:
                 result += f"{indent}  Params:\n"
                 for name, type_ in node.params:
-                    result += f"{indent}    {name} : {type_}\n"
+                    result += f"{indent}    {name} : {self.format_type(type_)}\n"
             result += f"{indent}  Return: {node.return_type}\n"
             if node.local_decls:
                 result += f"{indent}  Locals:\n"
                 for name, type_ in node.local_decls:
-                    result += f"{indent}    {name} : {type_}\n"
+                    result += f"{indent}    {name} : {self.format_type(type_)}\n"
             result += f"{indent}  Body:\n"
             for stmt in node.body.body:
                 result += self.getTextNode(stmt, level + 2)
@@ -383,11 +378,11 @@ class SyntaxAnalyzer:
             if node.params:
                 result += f"{indent}  Params:\n"
                 for name, type_ in node.params:
-                    result += f"{indent}    {name} : {type_}\n"
+                    result += f"{indent}    {name} : {self.format_type(type_)}\n"
             if node.local_decls:
                 result += f"{indent}  Locals:\n"
                 for name, type_ in node.local_decls:
-                    result += f"{indent}    {name} : {type_}\n"
+                    result += f"{indent}    {name} : {self.format_type(type_)}\n"
             result += f"{indent}  Body:\n"
             for stmt in node.body.body:
                 result += self.getTextNode(stmt, level + 2)
@@ -487,6 +482,58 @@ class SyntaxAnalyzer:
             self.advance()
             return node
         raise SyntaxError(f"Неверная метка CASE: {self.current_token.type}")
+
+    def parse_lvalue(self) -> ExpressionNode:
+        if self.current_token.type != 'IDENTIFIER':
+            raise SyntaxError(f"Ожидается идентификатор, получено {self.current_token.type}")
+        if self.peek() and self.peek().type == 'LBRACKET':
+            return self.parse_array_access()
+        node = ValueNode(self.current_token)
+        self.advance()
+        return node
+
+    def parse_array_access(self) -> ArrayAccessNode:
+        name = self.require('IDENTIFIER').value
+        self.require('LBRACKET')
+        index = self.parse_expression()
+        self.require('RBRACKET')
+        return ArrayAccessNode(name, index)
+
+    def parse_type(self, allow_array: bool) -> any:
+        if self.current_token.type == 'ARRAY':
+            if not allow_array:
+                raise SyntaxError("Массивы не поддерживаются в параметрах")
+            self.advance()
+            self.require('LBRACKET')
+            low_tok = self.require('NUMBER')
+            if '.' in low_tok.value:
+                raise SyntaxError("Нижняя граница массива должна быть integer")
+            self.require('RANGE')
+            high_tok = self.require('NUMBER')
+            if '.' in high_tok.value:
+                raise SyntaxError("Верхняя граница массива должна быть integer")
+            self.require('RBRACKET')
+            self.require('OF')
+            elem_type = self.parse_type(allow_array=False)
+            low = int(low_tok.value)
+            high = int(high_tok.value)
+            if low > high:
+                raise SyntaxError("Нижняя граница массива больше верхней")
+            return {'kind': 'array', 'low': low, 'high': high, 'elem': elem_type}
+
+        if self.current_token.type in ['INTEGER', 'STRING', 'BOOL', 'FLOAT', 'CHAR']:
+            var_type = self.current_token.value.lower()
+            if self.current_token.type == 'BOOL':
+                var_type = 'boolean'
+            self.advance()
+            return var_type
+
+        raise SyntaxError(f"Неверный тип: {self.current_token.value}")
+
+    def format_type(self, type_) -> str:
+        if isinstance(type_, dict) and type_.get('kind') == 'array':
+            return f"array[{type_['low']}..{type_['high']}] of {self.format_type(type_['elem'])}"
+        return str(type_)
 
     def parse_procedure_call(self) -> ProcedureCallNode:
         name = self.require('IDENTIFIER').value

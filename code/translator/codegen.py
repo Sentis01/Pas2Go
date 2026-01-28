@@ -22,9 +22,36 @@ class CodeGenerator:
         self.output = ''
         self.needs_fmt_import = False
         self.current_function = None
+        self.array_scopes = [{}]
+
+    def push_scope(self):
+        self.array_scopes.append({})
+
+    def pop_scope(self):
+        self.array_scopes.pop()
+
+    def register_array(self, name: str, low: int):
+        self.array_scopes[-1][name] = low
+
+    def lookup_array_low(self, name: str):
+        for scope in reversed(self.array_scopes):
+            if name in scope:
+                return scope[name]
+        return None
+
+    def format_type(self, type_) -> str:
+        if isinstance(type_, dict) and type_.get('kind') == 'array':
+            size = type_['high'] - type_['low'] + 1
+            elem = self.format_type(type_['elem'])
+            return f'[{size}]{elem}'
+        return toGo.get(type_, type_)
 
     def genVarDeclaration(self, node) -> str:
-        decls = [f'var {name} {toGo.get(type_, type_)}' for name, type_ in node.declarations]
+        decls = []
+        for name, type_ in node.declarations:
+            if isinstance(type_, dict) and type_.get('kind') == 'array':
+                self.register_array(name, type_['low'])
+            decls.append(f'var {name} {self.format_type(type_)}')
         return '\n'.join(decls) + '\n'
 
     def genProcedureCall(self, node) -> str:
@@ -154,6 +181,9 @@ class CodeGenerator:
         elif isinstance(node, FunctionCallNode):
             return self.genFunctionCall(node)
 
+        elif isinstance(node, ArrayAccessNode):
+            return self.genArrayAccess(node)
+
         elif isinstance(node, IfStatementNode):
             return self.genIfStatement(node, level)
 
@@ -180,17 +210,23 @@ class CodeGenerator:
         import_line = ''
 
         if isinstance(root, ProgramNode):
+            self.array_scopes = [{}]
             if root.declarations:
+                for name, type_ in root.declarations:
+                    if isinstance(type_, dict) and type_.get('kind') == 'array':
+                        self.register_array(name, type_['low'])
                 self.output += '\n'.join(
-                    f'var {name} {toGo.get(type_, type_)}' for name, type_ in root.declarations
+                    f'var {name} {self.format_type(type_)}' for name, type_ in root.declarations
                 ) + '\n\n'
 
             for routine in root.routines:
                 self.output += self.genRoutine(routine) + '\n\n'
 
             self.output += 'func main() {\n'
+            self.push_scope()
             for stmt in root.main_block.body:
                 self.output += self.genCode(stmt, 1) + '\n'
+            self.pop_scope()
             self.output += '}'
         else:
             self.output += 'func main() {\n'
@@ -215,26 +251,43 @@ class CodeGenerator:
         ret_type = toGo.get(node.return_type, node.return_type)
         code = f'func {node.name}({params}) {ret_type} {{\n'
         if node.local_decls:
+            self.push_scope()
             for name, type_ in node.local_decls:
-                code += MARGIN + f'var {name} {toGo.get(type_, type_)}\n'
+                if isinstance(type_, dict) and type_.get('kind') == 'array':
+                    self.register_array(name, type_['low'])
+                code += MARGIN + f'var {name} {self.format_type(type_)}\n'
+        else:
+            self.push_scope()
         prev_function = self.current_function
         self.current_function = node.name
         for stmt in node.body.body:
             code += self.genCode(stmt, 1) + '\n'
         self.current_function = prev_function
+        self.pop_scope()
         code += '}'
         return code
 
     def genProcedureDecl(self, node) -> str:
         params = ', '.join(f'{name} {toGo.get(type_, type_)}' for name, type_ in node.params)
         code = f'func {node.name}({params}) {{\n'
+        self.push_scope()
         if node.local_decls:
             for name, type_ in node.local_decls:
-                code += MARGIN + f'var {name} {toGo.get(type_, type_)}\n'
+                if isinstance(type_, dict) and type_.get('kind') == 'array':
+                    self.register_array(name, type_['low'])
+                code += MARGIN + f'var {name} {self.format_type(type_)}\n'
         prev_function = self.current_function
         self.current_function = None
         for stmt in node.body.body:
             code += self.genCode(stmt, 1) + '\n'
         self.current_function = prev_function
+        self.pop_scope()
         code += '}'
         return code
+
+    def genArrayAccess(self, node) -> str:
+        index = self.genCode(node.index)
+        low = self.lookup_array_low(node.name)
+        if low is None or low == 0:
+            return f'{node.name}[{index}]'
+        return f'{node.name}[({index}) - {low}]'
