@@ -25,7 +25,7 @@ class TranslatorTests(unittest.TestCase):
         src = """
 program t;
 var
-  a: bool;
+  a: boolean;
 begin
   a := not (true xor false) and true or false;
 end.
@@ -91,7 +91,7 @@ end.
         src = """
 program t;
 var
-  f: float;
+  f: real;
   c: char;
 begin
   f := 1.5;

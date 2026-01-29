@@ -65,14 +65,12 @@ class SyntaxAnalyzer:
             name = self.require('IDENTIFIER').value
             params = self.parse_params()
             self.require('COLON')
-            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOL']:
+            if self.current_token.type not in ['INTEGER', 'STRING', 'BOOLEAN', 'REAL', 'CHAR']:
                 raise SyntaxError(self.format_error(
                     f"Неверный тип возвращаемого значения: {self.current_token.value}",
                     self.current_token
                 ))
             return_type = self.current_token.value.lower()
-            if self.current_token.type == 'BOOL':
-                return_type = 'boolean'
             self.advance()
             self.require('SEMICOLON')
 
@@ -554,10 +552,8 @@ class SyntaxAnalyzer:
                 raise SyntaxError(self.format_error("Нижняя граница массива больше верхней", low_tok))
             return {'kind': 'array', 'low': low, 'high': high, 'elem': elem_type}
 
-        if self.current_token.type in ['INTEGER', 'STRING', 'BOOL', 'FLOAT', 'CHAR']:
+        if self.current_token.type in ['INTEGER', 'STRING', 'BOOLEAN', 'REAL', 'CHAR']:
             var_type = self.current_token.value.lower()
-            if self.current_token.type == 'BOOL':
-                var_type = 'boolean'
             self.advance()
             return var_type
 

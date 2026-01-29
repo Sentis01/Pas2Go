@@ -3,20 +3,20 @@
 ## 1. Типы
 Поддерживаются:
 - `integer`
-- `float`
+- `real`
 - `string`
 - `char`
-- `bool`
+- `boolean`
 
 В Go:
 - `integer` → `int`
-- `float` → `float64`
+- `real` → `float64`
 - `string` → `string`
 - `char` → `rune`
-- `bool` → `bool`
+- `boolean` → `bool`
 
 Ограничения:
-- Смешанная арифметика `integer` + `float` запрещена (нужны одинаковые числовые типы).
+- Смешанная арифметика `integer` + `real` запрещена (нужны одинаковые числовые типы).
 
 ## 2. Переменные
 ```

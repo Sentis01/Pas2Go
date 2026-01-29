@@ -216,7 +216,7 @@ class SemanticAnalyzer:
             left_type = self.infer_type(node.leftNode)
             right_type = self.infer_type(node.rightNode)
             if node.operator.value in ['+', '-', '*', '/', 'div', 'mod']:
-                if left_type not in ['integer', 'float'] or right_type not in ['integer', 'float']:
+                if left_type not in ['integer', 'real'] or right_type not in ['integer', 'real']:
                     raise TypeError(self.format_error(
                         "Арифметические операции требуют числовые типы",
                         node
@@ -241,7 +241,7 @@ class SemanticAnalyzer:
     def infer_type(self, node: ExpressionNode) -> str:
         if isinstance(node, ValueNode):
             if node.value.type == 'NUMBER':
-                return 'float' if '.' in node.value.value else 'integer'
+                return 'real' if '.' in node.value.value else 'integer'
             elif node.value.type == 'STRING':
                 return 'string'
             elif node.value.type == 'BOOL_LIT':
@@ -325,7 +325,7 @@ class SemanticAnalyzer:
                         "Арифметика с массивами не поддерживается",
                         node
                     ))
-                if left_type not in ['integer', 'float'] or right_type not in ['integer', 'float']:
+                if left_type not in ['integer', 'real'] or right_type not in ['integer', 'real']:
                     raise TypeError(self.format_error(
                         f"Арифметические операции требуют числовые типы, получено {left_type} и {right_type}",
                         node

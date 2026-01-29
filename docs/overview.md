@@ -29,7 +29,7 @@ Pas2Go — учебный транслятор из подмножества Pas
 
 ## Поддерживаемый поднабор PascalABC (на текущий момент)
 - Логические операторы: `and`, `or`, `not`, `xor`
-- Типы: `integer`, `float`, `string`, `char`, `bool`
+- Типы: `integer`, `real`, `string`, `char`, `boolean`
 - Присваивания
 - Условные конструкции: `if ... then ... else`
 - Циклы: `while`, `for ... to/downto`, `repeat ... until`

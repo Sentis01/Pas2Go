@@ -6,7 +6,7 @@ toGo = {
     'integer': 'int',
     'string': 'string',
     'boolean': 'bool',
-    'float': 'float64',
+    'real': 'float64',
     'char': 'rune',
     'and': '&&',
     'or': '||',

@@ -104,7 +104,7 @@ end.
 program t;
 var
   a: array[1..3] of integer;
-  f: float;
+  f: real;
 begin
   f := 1.5;
   a[f] := 1;
