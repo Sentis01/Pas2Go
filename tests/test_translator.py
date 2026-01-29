@@ -35,6 +35,40 @@ end.
         self.assertIn("||", out)
         self.assertIn("!", out)
 
+    def test_unary_minus(self):
+        src = """
+program t;
+var
+  x: integer;
+begin
+  x := -1;
+  x := -(1 + 2);
+end.
+"""
+        out = compile_pascal(src)
+        self.assertIn("x = -1", out)
+        self.assertIn("x = -(1 + 2)", out)
+
+    def test_parentheses_precedence(self):
+        src = """
+program t;
+var
+  x: integer;
+begin
+  x := (1 + 2) * 3;
+  x := 1 + 2 * 3;
+  x := (1 + 2) * (3 + 4);
+  x := 10 - (3 - 1);
+  x := 10 / (2 / 5);
+end.
+"""
+        out = compile_pascal(src)
+        self.assertIn("x = (1 + 2) * 3", out)
+        self.assertIn("x = 1 + 2 * 3", out)
+        self.assertIn("x = (1 + 2) * (3 + 4)", out)
+        self.assertIn("x = 10 - (3 - 1)", out)
+        self.assertIn("x = 10 / (2 / 5)", out)
+
     def test_functions_and_procedures(self):
         src = """
 program t;

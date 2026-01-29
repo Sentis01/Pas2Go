@@ -274,6 +274,14 @@ class SemanticAnalyzer:
                         node
                     ))
                 return 'boolean'
+            if node.operator.value == '-':
+                op_type = self.infer_type(node.operand)
+                if op_type not in ['integer', 'real']:
+                    raise TypeError(self.format_error(
+                        "Унарный минус требует числовой тип",
+                        node
+                    ))
+                return op_type
             return 'unknown'
 
         elif isinstance(node, FunctionCallNode):

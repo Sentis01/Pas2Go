@@ -284,6 +284,10 @@ class SyntaxAnalyzer:
             op_token = self.current_token
             self.advance()
             return UnaryOperatorNode(op_token, self.parse_unary())
+        if self.current_token and self.current_token.type == 'OPERATOR' and self.current_token.value == '-':
+            op_token = self.current_token
+            self.advance()
+            return UnaryOperatorNode(op_token, self.parse_unary())
         return self.parse_term()
     
     def getTextTree(self, root: StatementNode) -> str:

@@ -27,6 +27,25 @@ class CodeGenerator:
         self.needs_fmt_import = False
         self.current_function = None
         self.array_scopes = [{}]
+        self.prec = {
+            'or': 1,
+            'xor': 1,
+            'and': 2,
+            '=': 3,
+            '<>': 3,
+            '==': 3,
+            '!=': 3,
+            '<': 3,
+            '>': 3,
+            '<=': 3,
+            '>=': 3,
+            '+': 4,
+            '-': 4,
+            '*': 5,
+            '/': 5,
+            'div': 5,
+            'mod': 5,
+        }
 
     def push_scope(self):
         self.array_scopes.append({})
@@ -70,18 +89,24 @@ class CodeGenerator:
         return f'{node.name}({args})'
 
     def genBinOperator(self, node) -> str:
-        left = self.genCode(node.leftNode)
-        right = self.genCode(node.rightNode)
         op_key = node.operator.value.lower()
         op = toGo.get(op_key, node.operator.value)
+        left = self.genCode(node.leftNode)
+        right = self.genCode(node.rightNode)
         if op_key == ':=' and self.current_function and left == self.current_function:
             return f'return {right}'
+        if self.needs_parens(node.leftNode, op_key, side='left'):
+            left = f'({left})'
+        if self.needs_parens(node.rightNode, op_key, side='right'):
+            right = f'({right})'
         return f'{left} {op} {right}'
 
     def genUnaryOperator(self, node) -> str:
         op_key = node.operator.value.lower()
         op = toGo.get(op_key, node.operator.value)
         operand = self.genCode(node.operand)
+        if isinstance(node.operand, (BinOperatorNode, UnaryOperatorNode)):
+            return f'{op}({operand})'
         return f'{op}{operand}'
 
     def genBlock(self, node, level) -> str:
@@ -295,3 +320,21 @@ class CodeGenerator:
         if low is None or low == 0:
             return f'{node.name}[{index}]'
         return f'{node.name}[({index}) - {low}]'
+
+    def get_prec(self, node) -> int:
+        if isinstance(node, UnaryOperatorNode):
+            return 6
+        if isinstance(node, BinOperatorNode):
+            return self.prec.get(node.operator.value.lower(), 0)
+        return 100
+
+    def needs_parens(self, child, parent_op: str, side: str) -> bool:
+        if not isinstance(child, BinOperatorNode):
+            return False
+        parent_prec = self.prec.get(parent_op, 0)
+        child_prec = self.get_prec(child)
+        if child_prec < parent_prec:
+            return True
+        if child_prec == parent_prec and side == 'right' and parent_op in ['-', '/', 'div', 'mod']:
+            return True
+        return False
