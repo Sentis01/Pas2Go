@@ -1,3 +1,4 @@
+import importlib
 import os
 import sys
 import unittest
@@ -6,10 +7,10 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 TRANSLATOR_DIR = os.path.join(ROOT, "code", "translator")
 sys.path.insert(0, TRANSLATOR_DIR)
 
-import lexer
-import syntaxer
-import semanalyzer
-import codegen
+codegen = importlib.import_module("codegen")
+lexer = importlib.import_module("lexer")
+semanalyzer = importlib.import_module("semanalyzer")
+syntaxer = importlib.import_module("syntaxer")
 
 
 def compile_pascal(code: str) -> str:

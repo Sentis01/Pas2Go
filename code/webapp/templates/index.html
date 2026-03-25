@@ -45,33 +45,6 @@
         </div>
         <input type="file" id="upload-input" accept=".pas,.txt" class="d-none">
     </form>
-
-   
-    {% if output %}
-    <div class="row g-4 mt-4">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-header bg-info text-white">
-                    <h2 class="card-title mb-0">Syntax Tree</h2>
-                </div>
-                <div class="card-body">
-                    <textarea class="form-control fs-5" rows="8" readonly>{{ syntaxTree }}</textarea>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-header bg-warning text-dark">
-                    <h2 class="card-title mb-0">Tokens</h2>
-                </div>
-                <div class="card-body">
-                    <textarea class="form-control fs-5" rows="8" readonly>{{ tokens }}</textarea>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
 <script>
